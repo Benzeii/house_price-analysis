@@ -10,7 +10,7 @@ from sklearn.preprocessing import OneHotEncoder
 import sqlite3
 
 # Debug: Confirm code version
-print("Running code updated at 06:15 PM BST, July 14, 2025")
+print("Running code updated at 06:25 PM BST, July 14, 2025")
 
 # Set pandas display options to show all columns
 pd.set_option('display.max_columns', None)
@@ -64,9 +64,12 @@ encoded_cols = encoder.fit_transform(df[categorical_cols])
 encoded_df = pd.DataFrame(encoded_cols, columns=encoder.get_feature_names_out(categorical_cols), index=df.index)
 df = pd.concat([df.drop(columns=categorical_cols), encoded_df], axis=1)
 
+# Create interaction feature
+df['OverallQual_Cond'] = df['OverallQual'] * df['OverallCond']
+
 # Select features and target
-features = ['LotArea', 'YearBuilt', 'YearRemodAdd', 'OverallQual', 'OverallCond', 'TotalBsmtSF', 'GrLivArea', 
-            '1stFlrSF', '2ndFlrSF', 'GarageArea', 'BedroomAbvGr', 'FullBath', 'TotRmsAbvGrd', 'GarageCars', 
+features = ['LotArea', 'YearBuilt', 'YearRemodAdd', 'OverallQual', 'OverallCond', 'OverallQual_Cond', 'TotalBsmtSF', 
+            'GrLivArea', '1stFlrSF', '2ndFlrSF', 'GarageArea', 'BedroomAbvGr', 'FullBath', 'TotRmsAbvGrd', 'GarageCars', 
             'KitchenQual_Gd', 'Neighborhood_CollgCr', 'Neighborhood_NoRidge', 'Exterior1st_VinylSd']
 X = df[features]
 y = np.log1p(df['SalePrice'])  # Log transform target for better modeling
@@ -80,7 +83,7 @@ X_train_scaled = scaler.fit_transform(X_train)
 X_test_scaled = scaler.transform(X_test)
 
 # Train Gradient Boosting model
-model = GradientBoostingRegressor(n_estimators=75, max_depth=90, learning_rate=0.05, random_state=42)
+model = GradientBoostingRegressor(n_estimators=75, max_depth=60, learning_rate=0.05, min_samples_split=10, random_state=42)
 start_time = time.time()
 model.fit(X_train_scaled, y_train)
 print(f"Training completed in {time.time() - start_time:.2f} seconds")
@@ -126,6 +129,7 @@ cursor.execute('''
         year_remod_add INTEGER,
         overall_qual INTEGER,
         overall_cond INTEGER,
+        overall_qual_cond REAL,
         total_bsmt_sf REAL,
         gr_liv_area REAL,
         first_flr_sf REAL,
@@ -142,8 +146,11 @@ cursor.execute('''
 
 # Load cleaned data and insert into table with predicted_revenue as NULL
 df_clean = df[['LotArea', 'YearBuilt', 'YearRemodAdd', 'OverallQual', 'OverallCond', 'TotalBsmtSF', 'GrLivArea', 
-               '1stFlrSF', '2ndFlrSF', 'GarageArea', 'BedroomAbvGr', 'FullBath', 'TotRmsAbvGrd', 'GarageCars', 'SalePrice']].copy()
-df_clean = df_clean.rename(columns={'SalePrice': 'sale_price', '1stFlrSF': 'first_flr_sf', '2ndFlrSF': 'second_flr_sf'})
+               '1stFlrSF', '2ndFlrSF', 'GarageArea', 'BedroomAbvGr', 'FullBath', 'TotRmsAbvGrd', 'GarageCars', 
+               'SalePrice']].copy()
+df_clean['OverallQual_Cond'] = df['OverallQual'] * df['OverallCond']  # Add interaction
+df_clean = df_clean.rename(columns={'SalePrice': 'sale_price', '1stFlrSF': 'first_flr_sf', '2ndFlrSF': 'second_flr_sf', 
+                                   'OverallQual_Cond': 'overall_qual_cond'})
 df_clean['predicted_revenue'] = None
 df_clean.index.name = 'id'
 df_clean.to_sql('houses', conn, if_exists='replace', index=True)
