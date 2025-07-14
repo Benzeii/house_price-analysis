@@ -10,7 +10,7 @@ from sklearn.preprocessing import OneHotEncoder
 import sqlite3
 
 # Debug: Confirm code version
-print("Running code updated at 06:45 PM BST, July 14, 2025")
+print("Running code updated at 07:00 PM BST, July 14, 2025")
 
 # Set pandas display options to show all columns
 pd.set_option('display.max_columns', None)
@@ -68,13 +68,10 @@ df = pd.concat([df.drop(columns=categorical_cols), encoded_df], axis=1)
 df['OverallQual_Remod'] = df['OverallQual'] * df['YearRemodAdd']
 
 # Select features and target
-# Use encoded column for GarageFinish_RFn if available, otherwise skip
-garage_finish_rfn = [col for col in encoded_df.columns if 'GarageFinish_RFn' in col]
 features = ['LotArea', 'YearBuilt', 'YearRemodAdd', 'OverallQual', 'OverallCond', 'OverallQual_Remod', 'TotalBsmtSF', 
             'GrLivArea', '1stFlrSF', '2ndFlrSF', 'GarageArea', 'BedroomAbvGr', 'FullBath', 'TotRmsAbvGrd', 'GarageCars', 
-            'Fireplaces'] + (garage_finish_rfn if garage_finish_rfn else [])
-if not garage_finish_rfn:
-    print("Warning: GarageFinish_RFn not found in encoded columns, skipped.")
+            'Fireplaces', 'GarageYrBlt', 'MasVnrArea', 'KitchenQual_Gd', 'Neighborhood_CollgCr', 'Neighborhood_NoRidge', 
+            'Exterior1st_VinylSd']
 X = df[features]
 y = np.log1p(df['SalePrice'])  # Log transform target for better modeling
 
@@ -87,7 +84,7 @@ X_train_scaled = scaler.fit_transform(X_train)
 X_test_scaled = scaler.transform(X_test)
 
 # Train Gradient Boosting model
-model = GradientBoostingRegressor(n_estimators=75, max_depth=80, learning_rate=0.05, min_samples_leaf=5, random_state=42)
+model = GradientBoostingRegressor(n_estimators=75, max_depth=100, learning_rate=0.05, min_samples_leaf=10, random_state=42)
 start_time = time.time()
 model.fit(X_train_scaled, y_train)
 print(f"Training completed in {time.time() - start_time:.2f} seconds")
@@ -144,6 +141,8 @@ cursor.execute('''
         tot_rms_abv_grd INTEGER,
         garage_cars INTEGER,
         fireplaces INTEGER,
+        garage_yr_blt REAL,
+        mas_vnr_area REAL,
         sale_price REAL,
         predicted_revenue REAL DEFAULT NULL
     )
@@ -152,10 +151,11 @@ cursor.execute('''
 # Load cleaned data and insert into table with predicted_revenue as NULL
 df_clean = df[['LotArea', 'YearBuilt', 'YearRemodAdd', 'OverallQual', 'OverallCond', 'TotalBsmtSF', 'GrLivArea', 
                '1stFlrSF', '2ndFlrSF', 'GarageArea', 'BedroomAbvGr', 'FullBath', 'TotRmsAbvGrd', 'GarageCars', 
-               'Fireplaces', 'SalePrice']].copy()
+               'Fireplaces', 'GarageYrBlt', 'MasVnrArea', 'SalePrice']].copy()
 df_clean['OverallQual_Remod'] = df['OverallQual'] * df['YearRemodAdd']
 df_clean = df_clean.rename(columns={'SalePrice': 'sale_price', '1stFlrSF': 'first_flr_sf', '2ndFlrSF': 'second_flr_sf', 
-                                   'OverallQual_Remod': 'overall_qual_remod'})
+                                   'OverallQual_Remod': 'overall_qual_remod', 'GarageYrBlt': 'garage_yr_blt', 
+                                   'MasVnrArea': 'mas_vnr_area'})
 df_clean['predicted_revenue'] = None
 df_clean.index.name = 'id'
 df_clean.to_sql('houses', conn, if_exists='replace', index=True)
