@@ -10,7 +10,7 @@ from sklearn.preprocessing import OneHotEncoder
 import sqlite3
 
 # Debug: Confirm code version
-print("Running code updated at 05:15 PM BST, July 14, 2025")
+print("Running code updated at 05:55 PM BST, July 14, 2025")
 
 # Set pandas display options to show all columns
 pd.set_option('display.max_columns', None)
@@ -65,8 +65,9 @@ encoded_df = pd.DataFrame(encoded_cols, columns=encoder.get_feature_names_out(ca
 df = pd.concat([df.drop(columns=categorical_cols), encoded_df], axis=1)
 
 # Select features and target
-features = ['LotArea', 'YearBuilt', 'OverallQual', 'TotalBsmtSF', 'GrLivArea', 'GarageArea', 'Neighborhood_CollgCr', 
-            'Neighborhood_NoRidge', 'Exterior1st_VinylSd', 'KitchenQual_Gd']
+features = ['LotArea', 'YearBuilt', 'YearRemodAdd', 'OverallQual', 'OverallCond', 'TotalBsmtSF', 'GrLivArea', 
+            'GarageArea', 'BedroomAbvGr', 'FullBath', 'KitchenQual_Gd', 'Neighborhood_CollgCr', 
+            'Neighborhood_NoRidge', 'Exterior1st_VinylSd']
 X = df[features]
 y = np.log1p(df['SalePrice'])  # Log transform target for better modeling
 
@@ -79,7 +80,7 @@ X_train_scaled = scaler.fit_transform(X_train)
 X_test_scaled = scaler.transform(X_test)
 
 # Train Gradient Boosting model
-model = GradientBoostingRegressor(n_estimators=50, max_depth=30, learning_rate=0.1, random_state=42)
+model = GradientBoostingRegressor(n_estimators=50, max_depth=70, learning_rate=0.05, random_state=42)
 start_time = time.time()
 model.fit(X_train_scaled, y_train)
 print(f"Training completed in {time.time() - start_time:.2f} seconds")
@@ -117,17 +118,24 @@ cursor.execute('''
         id INTEGER PRIMARY KEY,
         lot_area REAL,
         year_built INTEGER,
+        year_remod_add INTEGER,
         overall_qual INTEGER,
+        overall_cond INTEGER,
         total_bsmt_sf REAL,
         gr_liv_area REAL,
         garage_area REAL,
+        bedroom_abv_gr INTEGER,
+        full_bath INTEGER,
         sale_price REAL,
         predicted_revenue REAL DEFAULT NULL
     )
 ''')
 
-# Load cleaned data and insert into table
-df_clean = df[['LotArea', 'YearBuilt', 'OverallQual', 'TotalBsmtSF', 'GrLivArea', 'GarageArea', 'SalePrice']].copy()
+# Load cleaned data and insert into table with predicted_revenue as NULL
+df_clean = df[['LotArea', 'YearBuilt', 'YearRemodAdd', 'OverallQual', 'OverallCond', 'TotalBsmtSF', 'GrLivArea', 
+               'GarageArea', 'BedroomAbvGr', 'FullBath', 'SalePrice']].copy()
+df_clean = df_clean.rename(columns={'SalePrice': 'sale_price'})  # Rename to match schema
+df_clean['predicted_revenue'] = None  # Add predicted_revenue column with NULL values
 df_clean.index.name = 'id'
 df_clean.to_sql('houses', conn, if_exists='replace', index=True)
 
