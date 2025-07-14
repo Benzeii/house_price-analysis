@@ -3,14 +3,14 @@ import numpy as np
 from datetime import datetime
 import time
 from sklearn.ensemble import GradientBoostingRegressor
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import train_test_split, cross_val_score
 from sklearn.metrics import mean_squared_error
 from sklearn.preprocessing import StandardScaler
 from sklearn.preprocessing import OneHotEncoder
 import sqlite3
 
 # Debug: Confirm code version
-print("Running code updated at 05:55 PM BST, July 14, 2025")
+print("Running code updated at 06:05 PM BST, July 14, 2025")
 
 # Set pandas display options to show all columns
 pd.set_option('display.max_columns', None)
@@ -66,8 +66,8 @@ df = pd.concat([df.drop(columns=categorical_cols), encoded_df], axis=1)
 
 # Select features and target
 features = ['LotArea', 'YearBuilt', 'YearRemodAdd', 'OverallQual', 'OverallCond', 'TotalBsmtSF', 'GrLivArea', 
-            'GarageArea', 'BedroomAbvGr', 'FullBath', 'KitchenQual_Gd', 'Neighborhood_CollgCr', 
-            'Neighborhood_NoRidge', 'Exterior1st_VinylSd']
+            'GarageArea', 'BedroomAbvGr', 'FullBath', 'TotRmsAbvGrd', 'GarageCars', 'KitchenQual_Gd', 
+            'Neighborhood_CollgCr', 'Neighborhood_NoRidge', 'Exterior1st_VinylSd']
 X = df[features]
 y = np.log1p(df['SalePrice'])  # Log transform target for better modeling
 
@@ -80,10 +80,15 @@ X_train_scaled = scaler.fit_transform(X_train)
 X_test_scaled = scaler.transform(X_test)
 
 # Train Gradient Boosting model
-model = GradientBoostingRegressor(n_estimators=50, max_depth=70, learning_rate=0.05, random_state=42)
+model = GradientBoostingRegressor(n_estimators=50, max_depth=80, learning_rate=0.05, random_state=42)
 start_time = time.time()
 model.fit(X_train_scaled, y_train)
 print(f"Training completed in {time.time() - start_time:.2f} seconds")
+
+# Cross-validation check
+cv_scores = cross_val_score(model, X_train_scaled, y_train, cv=5, scoring='neg_mean_squared_error')
+print(f"Cross-validation MSE scores: {[-s for s in cv_scores]}")
+print(f"Mean CV MSE: {np.mean([-s for s in cv_scores]):.2f}")
 
 # Predict on test set
 y_pred_log = model.predict(X_test_scaled)
@@ -126,6 +131,8 @@ cursor.execute('''
         garage_area REAL,
         bedroom_abv_gr INTEGER,
         full_bath INTEGER,
+        tot_rms_abv_grd INTEGER,
+        garage_cars INTEGER,
         sale_price REAL,
         predicted_revenue REAL DEFAULT NULL
     )
@@ -133,9 +140,9 @@ cursor.execute('''
 
 # Load cleaned data and insert into table with predicted_revenue as NULL
 df_clean = df[['LotArea', 'YearBuilt', 'YearRemodAdd', 'OverallQual', 'OverallCond', 'TotalBsmtSF', 'GrLivArea', 
-               'GarageArea', 'BedroomAbvGr', 'FullBath', 'SalePrice']].copy()
-df_clean = df_clean.rename(columns={'SalePrice': 'sale_price'})  # Rename to match schema
-df_clean['predicted_revenue'] = None  # Add predicted_revenue column with NULL values
+               'GarageArea', 'BedroomAbvGr', 'FullBath', 'TotRmsAbvGrd', 'GarageCars', 'SalePrice']].copy()
+df_clean = df_clean.rename(columns={'SalePrice': 'sale_price'})
+df_clean['predicted_revenue'] = None
 df_clean.index.name = 'id'
 df_clean.to_sql('houses', conn, if_exists='replace', index=True)
 
