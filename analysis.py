@@ -10,8 +10,7 @@ from sklearn.preprocessing import OneHotEncoder
 import sqlite3
 import joblib
 
-# Debug: Confirm code version
-print("Running code updated at 05:50 PM BST, July 14, 2025 - Targeting $755,000+")
+
 
 # Set pandas display options to show all columns
 pd.set_option('display.max_columns', None)
