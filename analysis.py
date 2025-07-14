@@ -10,7 +10,7 @@ from sklearn.preprocessing import OneHotEncoder
 import sqlite3
 
 # Debug: Confirm code version
-print("Running code updated at 06:05 PM BST, July 14, 2025")
+print("Running code updated at 06:15 PM BST, July 14, 2025")
 
 # Set pandas display options to show all columns
 pd.set_option('display.max_columns', None)
@@ -66,8 +66,8 @@ df = pd.concat([df.drop(columns=categorical_cols), encoded_df], axis=1)
 
 # Select features and target
 features = ['LotArea', 'YearBuilt', 'YearRemodAdd', 'OverallQual', 'OverallCond', 'TotalBsmtSF', 'GrLivArea', 
-            'GarageArea', 'BedroomAbvGr', 'FullBath', 'TotRmsAbvGrd', 'GarageCars', 'KitchenQual_Gd', 
-            'Neighborhood_CollgCr', 'Neighborhood_NoRidge', 'Exterior1st_VinylSd']
+            '1stFlrSF', '2ndFlrSF', 'GarageArea', 'BedroomAbvGr', 'FullBath', 'TotRmsAbvGrd', 'GarageCars', 
+            'KitchenQual_Gd', 'Neighborhood_CollgCr', 'Neighborhood_NoRidge', 'Exterior1st_VinylSd']
 X = df[features]
 y = np.log1p(df['SalePrice'])  # Log transform target for better modeling
 
@@ -80,7 +80,7 @@ X_train_scaled = scaler.fit_transform(X_train)
 X_test_scaled = scaler.transform(X_test)
 
 # Train Gradient Boosting model
-model = GradientBoostingRegressor(n_estimators=50, max_depth=80, learning_rate=0.05, random_state=42)
+model = GradientBoostingRegressor(n_estimators=75, max_depth=90, learning_rate=0.05, random_state=42)
 start_time = time.time()
 model.fit(X_train_scaled, y_train)
 print(f"Training completed in {time.time() - start_time:.2f} seconds")
@@ -128,6 +128,8 @@ cursor.execute('''
         overall_cond INTEGER,
         total_bsmt_sf REAL,
         gr_liv_area REAL,
+        first_flr_sf REAL,
+        second_flr_sf REAL,
         garage_area REAL,
         bedroom_abv_gr INTEGER,
         full_bath INTEGER,
@@ -140,8 +142,8 @@ cursor.execute('''
 
 # Load cleaned data and insert into table with predicted_revenue as NULL
 df_clean = df[['LotArea', 'YearBuilt', 'YearRemodAdd', 'OverallQual', 'OverallCond', 'TotalBsmtSF', 'GrLivArea', 
-               'GarageArea', 'BedroomAbvGr', 'FullBath', 'TotRmsAbvGrd', 'GarageCars', 'SalePrice']].copy()
-df_clean = df_clean.rename(columns={'SalePrice': 'sale_price'})
+               '1stFlrSF', '2ndFlrSF', 'GarageArea', 'BedroomAbvGr', 'FullBath', 'TotRmsAbvGrd', 'GarageCars', 'SalePrice']].copy()
+df_clean = df_clean.rename(columns={'SalePrice': 'sale_price', '1stFlrSF': 'first_flr_sf', '2ndFlrSF': 'second_flr_sf'})
 df_clean['predicted_revenue'] = None
 df_clean.index.name = 'id'
 df_clean.to_sql('houses', conn, if_exists='replace', index=True)
