@@ -10,7 +10,7 @@ from sklearn.preprocessing import OneHotEncoder
 import sqlite3
 
 # Debug: Confirm code version
-print("Running code updated at 05:05 PM BST, July 14, 2025")
+print("Running code updated at 05:15 PM BST, July 14, 2025")
 
 # Set pandas display options to show all columns
 pd.set_option('display.max_columns', None)
@@ -79,7 +79,7 @@ X_train_scaled = scaler.fit_transform(X_train)
 X_test_scaled = scaler.transform(X_test)
 
 # Train Gradient Boosting model
-model = GradientBoostingRegressor(n_estimators=100, max_depth=20, learning_rate=0.1, random_state=42)
+model = GradientBoostingRegressor(n_estimators=50, max_depth=30, learning_rate=0.1, random_state=42)
 start_time = time.time()
 model.fit(X_train_scaled, y_train)
 print(f"Training completed in {time.time() - start_time:.2f} seconds")
@@ -122,7 +122,7 @@ cursor.execute('''
         gr_liv_area REAL,
         garage_area REAL,
         sale_price REAL,
-        predicted_revenue REAL
+        predicted_revenue REAL DEFAULT NULL
     )
 ''')
 
