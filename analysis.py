@@ -5,7 +5,7 @@ import time
 from sklearn.preprocessing import OneHotEncoder
 
 # Debug: Confirm code version
-print("Running code updated at 04:35 PM BST, July 14, 2025")
+print("Running code updated at 04:45 PM BST, July 14, 2025")
 
 # Set pandas display options to show all columns
 pd.set_option('display.max_columns', None)
@@ -51,13 +51,13 @@ Q3 = df['SalePrice'].quantile(0.75)
 IQR = Q3 - Q1
 lower_bound = Q1 - 1.5 * IQR
 upper_bound = Q3 + 1.5 * IQR
-df = df[(df['SalePrice'] >= max(10000, lower_bound)) & (df['SalePrice'] <= upper_bound)]
+df = df[(df['SalePrice'] >= max(10000, lower_bound)) & (df['SalePrice'] <= upper_bound)].reset_index(drop=True)
 
 # Encode categorical variables
 categorical_cols = df.select_dtypes(include=['object']).columns
 encoder = OneHotEncoder(sparse_output=False, drop='first', handle_unknown='ignore')
 encoded_cols = encoder.fit_transform(df[categorical_cols])
-encoded_df = pd.DataFrame(encoded_cols, columns=encoder.get_feature_names_out(categorical_cols))
+encoded_df = pd.DataFrame(encoded_cols, columns=encoder.get_feature_names_out(categorical_cols), index=df.index)
 df = pd.concat([df.drop(columns=categorical_cols), encoded_df], axis=1)
 
 # Print cleaned shape and missing values
