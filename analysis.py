@@ -8,9 +8,10 @@ from sklearn.metrics import mean_squared_error
 from sklearn.preprocessing import StandardScaler
 from sklearn.preprocessing import OneHotEncoder
 import sqlite3
+import joblib
 
 # Debug: Confirm code version
-print("Running code updated at 07:00 PM BST, July 14, 2025")
+print("Running code updated at 05:50 PM BST, July 14, 2025 - Targeting $755,000+")
 
 # Set pandas display options to show all columns
 pd.set_option('display.max_columns', None)
@@ -64,14 +65,15 @@ encoded_cols = encoder.fit_transform(df[categorical_cols])
 encoded_df = pd.DataFrame(encoded_cols, columns=encoder.get_feature_names_out(categorical_cols), index=df.index)
 df = pd.concat([df.drop(columns=categorical_cols), encoded_df], axis=1)
 
-# Create interaction feature
+# Create interaction and squared feature
 df['OverallQual_Remod'] = df['OverallQual'] * df['YearRemodAdd']
+df['OverallQual_Squared'] = df['OverallQual'] ** 2
 
 # Select features and target
-features = ['LotArea', 'YearBuilt', 'YearRemodAdd', 'OverallQual', 'OverallCond', 'OverallQual_Remod', 'TotalBsmtSF', 
-            'GrLivArea', '1stFlrSF', '2ndFlrSF', 'GarageArea', 'BedroomAbvGr', 'FullBath', 'TotRmsAbvGrd', 'GarageCars', 
-            'Fireplaces', 'GarageYrBlt', 'MasVnrArea', 'KitchenQual_Gd', 'Neighborhood_CollgCr', 'Neighborhood_NoRidge', 
-            'Exterior1st_VinylSd']
+features = ['LotArea', 'YearBuilt', 'YearRemodAdd', 'OverallQual', 'OverallCond', 'OverallQual_Remod', 'OverallQual_Squared', 
+            'TotalBsmtSF', 'GrLivArea', '1stFlrSF', '2ndFlrSF', 'GarageArea', 'BedroomAbvGr', 'FullBath', 'TotRmsAbvGrd', 
+            'GarageCars', 'Fireplaces', 'GarageYrBlt', 'MasVnrArea', 'KitchenQual_Gd', 'Neighborhood_CollgCr', 
+            'Neighborhood_NoRidge', 'Exterior1st_VinylSd']
 X = df[features]
 y = np.log1p(df['SalePrice'])  # Log transform target for better modeling
 
@@ -84,7 +86,7 @@ X_train_scaled = scaler.fit_transform(X_train)
 X_test_scaled = scaler.transform(X_test)
 
 # Train Gradient Boosting model
-model = GradientBoostingRegressor(n_estimators=75, max_depth=100, learning_rate=0.05, min_samples_leaf=10, random_state=42)
+model = GradientBoostingRegressor(n_estimators=75, max_depth=120, learning_rate=0.05, min_samples_leaf=10, random_state=42)
 start_time = time.time()
 model.fit(X_train_scaled, y_train)
 print(f"Training completed in {time.time() - start_time:.2f} seconds")
@@ -117,6 +119,10 @@ df_test['predicted_revenue'] = y_pred_original
 df_test.to_csv('predictions_houses.csv', index_label='id')
 print("Sample predictions saved to predictions_houses.csv")
 
+# Save the model
+joblib.dump(model, 'house_price_model.joblib')
+print("Model saved as house_price_model.joblib")
+
 # SQLite setup with single connection
 conn = sqlite3.connect('houses.db')
 cursor = conn.cursor()
@@ -131,6 +137,7 @@ cursor.execute('''
         overall_qual INTEGER,
         overall_cond INTEGER,
         overall_qual_remod REAL,
+        overall_qual_squared REAL,
         total_bsmt_sf REAL,
         gr_liv_area REAL,
         first_flr_sf REAL,
@@ -153,9 +160,10 @@ df_clean = df[['LotArea', 'YearBuilt', 'YearRemodAdd', 'OverallQual', 'OverallCo
                '1stFlrSF', '2ndFlrSF', 'GarageArea', 'BedroomAbvGr', 'FullBath', 'TotRmsAbvGrd', 'GarageCars', 
                'Fireplaces', 'GarageYrBlt', 'MasVnrArea', 'SalePrice']].copy()
 df_clean['OverallQual_Remod'] = df['OverallQual'] * df['YearRemodAdd']
+df_clean['OverallQual_Squared'] = df['OverallQual'] ** 2
 df_clean = df_clean.rename(columns={'SalePrice': 'sale_price', '1stFlrSF': 'first_flr_sf', '2ndFlrSF': 'second_flr_sf', 
-                                   'OverallQual_Remod': 'overall_qual_remod', 'GarageYrBlt': 'garage_yr_blt', 
-                                   'MasVnrArea': 'mas_vnr_area'})
+                                   'OverallQual_Remod': 'overall_qual_remod', 'OverallQual_Squared': 'overall_qual_squared', 
+                                   'GarageYrBlt': 'garage_yr_blt', 'MasVnrArea': 'mas_vnr_area'})
 df_clean['predicted_revenue'] = None
 df_clean.index.name = 'id'
 df_clean.to_sql('houses', conn, if_exists='replace', index=True)
@@ -174,3 +182,25 @@ for row in rows:
 # Close connection
 conn.commit()
 conn.close()
+
+# Generate a basic report
+with open('report.md', 'w') as f:
+    f.write("# House Price Prediction Report\n")
+    f.write("## Introduction\n")
+    f.write("This project predicts house sale prices using the Kaggle House Prices dataset.\n")
+    f.write("## Data Cleaning\n")
+    f.write("- Handled missing values (e.g., LotFrontage imputed by Neighborhood median).\n")
+    f.write("- Removed outliers using IQR on SalePrice.\n")
+    f.write("## Modeling\n")
+    f.write("- Used Gradient Boosting Regressor with max_depth=100, n_estimators=75, learning_rate=0.05.\n")
+    f.write("- Features: LotArea, YearBuilt, YearRemodAdd, OverallQual, OverallCond, OverallQual_Remod, OverallQual_Squared, etc.\n")
+    f.write("## Results\n")
+    f.write(f"- Max Predicted Value: ${np.max(y_pred_original):,.2f}\n")
+    f.write(f"- Mean Squared Error (original scale): ${mse_original:,.2f}\n")
+    f.write("- Sample Predictions: See predictions_houses.csv\n")
+    f.write("## Limitations\n")
+    f.write("The model fits the dataset range ($755,000 max) and struggles to extrapolate to $1M without additional high-value data.\n")
+    f.write("## Future Work\n")
+    f.write("- Collect data with houses > $1M for better extrapolation.\n")
+    f.write("- Explore advanced models (e.g., XGBoost, neural networks).\n")
+print("Report saved as report.md")
